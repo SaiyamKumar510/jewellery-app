@@ -66,6 +66,7 @@ def get_conn():
     password=DB_CONFIG["password"],
     database=DB_CONFIG["database"],
     port=DB_CONFIG["port"],
+    connection_timeout=5,
     autocommit=False
 )
     _create_tables(conn)
