@@ -1,2 +1,7 @@
-Flask
+flask
 mysql-connector-python
+reportlab
+gunicorn
+
+
+
