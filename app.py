@@ -410,6 +410,9 @@ pdf_gen = PDFGenerator()
 def index():
     return render_template("index.html")
 
+@app.route("/test")
+def test():
+    return "OK"
 
 # ── Save invoice + generate PDF ─────────────────────────────────────────────
 @app.route("/save_invoice", methods=["POST"])
