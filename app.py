@@ -5,7 +5,6 @@ Mirrors all features of the Tkinter desktop app:
   • Billing  : save invoice + generate PDF
   • History  : list invoices, search, show items
   • Reprint  : regenerate PDF for any past invoice
-  • Reverse  : handled entirely in JS (no server needed)
   • DB init  : auto-creates DB and tables on first run
 """
 
@@ -42,6 +41,9 @@ DB_CONFIG = {
 PDF_DIR = os.path.join(os.path.dirname(__file__), "invoices")
 os.makedirs(PDF_DIR, exist_ok=True)
 
+# Logo image path — place logo.png in static/ folder
+LOGO_PATH = os.path.join(os.path.dirname(__file__), "static", "logo.png")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DATABASE
@@ -61,14 +63,14 @@ def get_conn():
         raise ConnectionError(str(e))
 
     conn = mysql.connector.connect(
-    host=DB_CONFIG["host"],
-    user=DB_CONFIG["user"],
-    password=DB_CONFIG["password"],
-    database=DB_CONFIG["database"],
-    port=DB_CONFIG["port"],
-    connection_timeout=5,
-    autocommit=False
-)
+        host=DB_CONFIG["host"],
+        user=DB_CONFIG["user"],
+        password=DB_CONFIG["password"],
+        database=DB_CONFIG["database"],
+        port=DB_CONFIG["port"],
+        connection_timeout=5,
+        autocommit=False
+    )
     _create_tables(conn)
     return conn
 
@@ -136,7 +138,7 @@ def next_invoice_no(cur):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PDF GENERATOR  (identical logic to the Tkinter version)
+# PDF GENERATOR
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class PDFGenerator:
@@ -179,6 +181,22 @@ class PDFGenerator:
         c.setLineWidth(0.8)
         c.line(0, H - band_h + 3.5*mm, W, H - band_h + 3.5*mm)
 
+        # ── Logo images on each side (if logo.png exists) ──
+        logo_size = 22 * mm
+        logo_y    = H - band_h + (band_h - logo_size) / 2  # vertically centred in band
+        if os.path.exists(LOGO_PATH):
+            # Left logo
+            c.drawImage(LOGO_PATH,
+                        self.MARGIN, logo_y,
+                        width=logo_size, height=logo_size,
+                        preserveAspectRatio=True, mask="auto")
+            # Right logo
+            c.drawImage(LOGO_PATH,
+                        W - self.MARGIN - logo_size, logo_y,
+                        width=logo_size, height=logo_size,
+                        preserveAspectRatio=True, mask="auto")
+
+        # ── Shop name & details (centred between the two logos) ──
         c.setFillColor(self.C_GOLD)
         c.setFont("Helvetica-Bold", 22)
         c.drawCentredString(W / 2, H - 13*mm, "TILAK RAJ AND SONS JEWELLERS")
@@ -609,13 +627,6 @@ def reprint_invoice(invoice_no):
         return jsonify({"error": str(e)}), 500
 
 
-# ── Download reprint ─────────────────────────────────────────────────────────
-@app.route("/download_pdf/<invoice_no>")
-def download_pdf_reprint(invoice_no):
-    # handled by the same /download_pdf route above; Flask uses the first one
-    pass
-
-
 # ── Reconnect DB ─────────────────────────────────────────────────────────────
 @app.route("/reconnect_db", methods=["POST"])
 def reconnect_db():
@@ -624,7 +635,7 @@ def reconnect_db():
     new_cfg = {
         "host":     data.get("host", "localhost"),
         "user":     data.get("user", "root"),
-        "password": data.get("password", "Saiyam1253"),
+        "password": data.get("password", ""),
         "database": data.get("database", "jewellery_db"),
     }
     try:

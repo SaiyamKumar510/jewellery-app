@@ -51,6 +51,18 @@ body {
 .header-emblem {
     font-size: 28px;
     filter: drop-shadow(0 0 6px var(--gold));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Logo image in header — place your logo.png in static/ folder */
+.header-logo-img {
+    width: 54px;
+    height: 54px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(218,165,32,0.6));
+    border-radius: 4px;
 }
 
 .header-text {
@@ -299,6 +311,23 @@ select:focus {
     min-height: 36px;
     display: flex;
     align-items: center;
+    flex-direction: column;
+    gap: 2px;
+    justify-content: center;
+}
+
+/* Two-line preview: base + grand */
+.preview-base {
+    font-size: 11px;
+    color: #888;
+    font-style: italic;
+}
+
+.preview-grand {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--dark-brown);
+    font-style: normal;
 }
 
 /* ─── BUTTONS ───────────────────────────────────────────── */
@@ -524,76 +553,6 @@ tbody tr:hover { background: #FFE8A0; transition: background 0.15s; }
     text-align: center;
 }
 
-/* ─── REVERSE CALCULATOR ───────────────────────────────── */
-.reverse-card {
-    border-radius: 0 0 10px 10px;
-    max-width: 700px;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    padding: 24px 28px;
-}
-
-/* .rev-section {} */
-
-.rev-subsection {
-    border: 1.5px solid var(--border-gold);
-    border-radius: 7px;
-    padding: 16px 18px;
-    background: var(--off-white);
-}
-
-.subsection-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 15px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    letter-spacing: 0.5px;
-}
-
-.gold-title  { color: var(--dark-gold); }
-.silver-title { color: #888; }
-
-.rev-fields {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.field-group-inline {
-    flex-direction: row;
-    align-items: center;
-    gap: 14px;
-}
-
-.field-group-inline label {
-    white-space: nowrap;
-    margin-bottom: 0;
-}
-
-.rev-btn-row {
-    display: flex;
-    gap: 14px;
-    align-items: center;
-}
-
-.result-panel {
-    background: var(--header-bg);
-    border: 1.5px solid var(--dark-gold);
-    border-radius: 7px;
-    padding: 18px 22px;
-    overflow-x: auto;
-}
-
-.result-panel pre {
-    color: var(--gold);
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    line-height: 1.65;
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
 /* ─── STATUS BAR ────────────────────────────────────────── */
 .status-bar {
     position: fixed;
@@ -699,6 +658,7 @@ tbody tr:hover { background: #FFE8A0; transition: background 0.15s; }
         align-items: flex-start;
     }
     .header-text h1 { font-size: 20px; }
+    .header-logo-img { width: 42px; height: 42px; }
 }
 
 @media (max-width: 600px) {
@@ -709,4 +669,5 @@ tbody tr:hover { background: #FFE8A0; transition: background 0.15s; }
     }
     .tabs-nav { overflow-x: auto; }
     .tab-btn  { padding: 10px 14px; font-size: 13px; }
+    .header-logo-img { width: 36px; height: 36px; }
 }

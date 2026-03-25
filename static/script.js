@@ -14,7 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
     setStatusDate();
     initTabs();
     onCommodityChange();
-    onRevModeChange();
 });
 
 /* ─── STATUS DATE ───────────────────────────────────────── */
@@ -36,7 +35,6 @@ function initTabs() {
             document.getElementById("tab-" + target).classList.add("active");
 
             if (target === "history") loadHistory();
-            if (target === "reverse") resetReverseCalc();
         });
     });
 }
@@ -53,13 +51,17 @@ function onCommodityChange() {
     const caratGroup = document.getElementById("carat-group");
     caratGroup.style.display = (com === "Gold") ? "" : "none";
 
-    document.getElementById("live_preview").textContent = "—";
+    clearPreview();
 }
 
 function onModeChange() {
     document.getElementById("weight").value = "";
     document.getElementById("amount_input").value = "";
-    document.getElementById("live_preview").textContent = "—";
+    clearPreview();
+}
+
+function clearPreview() {
+    document.getElementById("live_preview").innerHTML = "<span style='color:#aaa;font-style:italic;'>—</span>";
 }
 
 function getRatePer10g() {
@@ -76,32 +78,68 @@ function getMakingPct() {
     return parseFloat(document.getElementById("making_charges").value) || 0;
 }
 
+/**
+ * Compute grand total including making charges + GST (3%) for a given base metal amount.
+ * Returns { baseAmt, makingAmt, taxable, gst, grand }
+ */
+function computeGrand(baseAmt) {
+    const makingPct  = getMakingPct();
+    const makingAmt  = baseAmt * makingPct / 100;
+    const taxable    = baseAmt + makingAmt;
+    const gst        = taxable * 0.03;   // 3% GST (CGST 1.5% + SGST 1.5%)
+    const grand      = taxable + gst;
+    return { baseAmt, makingAmt, taxable, gst, grand };
+}
+
 function livePreviewWeight() {
     const mode = document.querySelector('input[name="input_mode"]:checked').value;
     if (mode !== "Weight") return;
+
     const w    = parseFloat(document.getElementById("weight").value);
     const rate = getRatePer10g();
+
     if (!isNaN(w) && w > 0 && rate > 0) {
-        const amt = (w / 10) * rate;
-        document.getElementById("live_preview").textContent =
-            "→ Amount: Rs. " + fmt(amt);
+        const baseAmt = (w / 10) * rate;
+        const { grand } = computeGrand(baseAmt);
+        setPreviewHTML(baseAmt, grand);
     } else {
-        document.getElementById("live_preview").textContent = "—";
+        clearPreview();
     }
 }
 
 function livePreviewAmount() {
     const mode = document.querySelector('input[name="input_mode"]:checked').value;
     if (mode !== "Amount") return;
+
     const amt  = parseFloat(document.getElementById("amount_input").value);
     const rate = getRatePer10g();
+
     if (!isNaN(amt) && amt > 0 && rate > 0) {
-        const w = (amt / rate) * 10;
-        document.getElementById("live_preview").textContent =
-            "→ Weight: " + w.toFixed(4) + " g";
+        // In Amount mode, the entered amount IS the base metal value
+        const baseAmt = amt;
+        const w       = (amt / rate) * 10;
+        const { grand } = computeGrand(baseAmt);
+        setPreviewHTML(baseAmt, grand, w);
     } else {
-        document.getElementById("live_preview").textContent = "—";
+        clearPreview();
     }
+}
+
+/**
+ * Sets the two-line live preview:
+ *   Line 1 (small, grey): Base: Rs. X  [+ Weight if amount mode]
+ *   Line 2 (bold, dark):  Total (incl. GST): Rs. Y
+ */
+function setPreviewHTML(baseAmt, grand, weightG) {
+    const makingPct = getMakingPct();
+    let line1 = `Base: Rs. ${fmt(baseAmt)}`;
+    if (makingPct > 0) line1 += ` + ${makingPct}% making`;
+    if (weightG !== undefined) line1 += ` | Wt: ${weightG.toFixed(4)} g`;
+
+    const el = document.getElementById("live_preview");
+    el.innerHTML =
+        `<span class="preview-base">${line1}</span>` +
+        `<span class="preview-grand">→ Rs. ${fmt(grand)} (incl. GST)</span>`;
 }
 
 function addItem() {
@@ -139,7 +177,7 @@ function addItem() {
     document.getElementById("weight").value       = "";
     document.getElementById("amount_input").value = "";
     document.getElementById("description").value  = "";
-    document.getElementById("live_preview").textContent = "—";
+    clearPreview();
 }
 
 function removeItem(idx) {
@@ -194,7 +232,7 @@ function clearAll() {
     document.getElementById("buyer").value          = "";
     document.getElementById("description").value    = "";
     document.getElementById("making_charges").value = "0";
-    document.getElementById("live_preview").textContent = "—";
+    clearPreview();
 }
 
 function generateInvoice() {
@@ -326,164 +364,6 @@ function reprintInvoiceNo(invoiceNo) {
             window.location.href = "/download_pdf/" + encodeURIComponent(invoiceNo) + "?reprint=1";
         })
         .catch(() => showToast("Network error.", "error"));
-}
-
-
-/* ═══════════════════════════════════════════════════════
-   REVERSE CALCULATOR TAB
-═══════════════════════════════════════════════════════ */
-
-const GST_RATE = 0.03;
-
-function onRevModeChange() {
-    const mode = document.querySelector('input[name="rev_mode"]:checked').value;
-
-    // "Final Amount" field: shown for Gold/Silver, hidden for Both
-    document.getElementById("rev-final-group").style.display =
-        (mode === "Both") ? "none" : "";
-
-    // Gold section visibility
-    document.getElementById("rev-gold-section").style.display =
-        (mode === "Silver") ? "none" : "";
-
-    // Silver section visibility
-    document.getElementById("rev-silver-section").style.display =
-        (mode === "Gold") ? "none" : "";
-
-    // Per-section amount fields (only shown in "Both" mode)
-    document.getElementById("rev-gold-amount-group").style.display =
-        (mode === "Both") ? "" : "none";
-    document.getElementById("rev-silver-amount-group").style.display =
-        (mode === "Both") ? "" : "none";
-
-    resetReverseResult();
-}
-
-function reverseCalculate() {
-    const mode = document.querySelector('input[name="rev_mode"]:checked').value;
-    let lines = [];
-
-    try {
-        if (mode === "Gold" || mode === "Silver") {
-            const final = parseFloat(document.getElementById("rev_final").value);
-            if (isNaN(final) || final <= 0) throw new Error("invalid");
-
-            const base  = final / (1 + GST_RATE);
-            const gst   = final - base;
-            const cgst  = base * 0.015;
-            const sgst  = base * 0.015;
-
-            if (mode === "Gold") {
-                const rate10 = parseFloat(document.getElementById("rev_g_rate").value);
-                if (isNaN(rate10) || rate10 <= 0) throw new Error("invalid rate");
-                const weight = (base / rate10) * 10;
-                lines = [
-                    "  ═══════════════════════════════",
-                    "  GOLD REVERSE CALCULATION",
-                    "  ═══════════════════════════════",
-                    `  Grand Total (paid) : Rs. ${fmt(final)}`,
-                    "  ─────────────────────────────",
-                    `  Base Value (ex-GST): Rs. ${fmt(base)}`,
-                    `  CGST @ 1.5%        : Rs. ${fmt(cgst)}`,
-                    `  SGST @ 1.5%        : Rs. ${fmt(sgst)}`,
-                    `  Total GST          : Rs. ${fmt(gst)}`,
-                    "  ─────────────────────────────",
-                    `  Gold Rate / 10g    : Rs. ${fmt(rate10)}`,
-                    `  Gold Weight        : ${weight.toFixed(4)} grams`,
-                    "  ═══════════════════════════════",
-                ];
-            } else {
-                const rate1k = parseFloat(document.getElementById("rev_s_rate").value);
-                if (isNaN(rate1k) || rate1k <= 0) throw new Error("invalid rate");
-                const rate10 = rate1k / 100.0;
-                const weight = (base / rate10) * 10;
-                lines = [
-                    "  ═══════════════════════════════",
-                    "  SILVER REVERSE CALCULATION",
-                    "  ═══════════════════════════════",
-                    `  Grand Total (paid) : Rs. ${fmt(final)}`,
-                    "  ─────────────────────────────",
-                    `  Base Value (ex-GST): Rs. ${fmt(base)}`,
-                    `  CGST @ 1.5%        : Rs. ${fmt(cgst)}`,
-                    `  SGST @ 1.5%        : Rs. ${fmt(sgst)}`,
-                    `  Total GST          : Rs. ${fmt(gst)}`,
-                    "  ─────────────────────────────",
-                    `  Silver Rate / 1 kg : Rs. ${fmt(rate1k)}`,
-                    `  Silver Rate / 10g  : Rs. ${fmt(rate10)}`,
-                    `  Silver Weight      : ${weight.toFixed(4)} grams`,
-                    "  ═══════════════════════════════",
-                ];
-            }
-        } else {
-            // Both
-            const gAmt   = parseFloat(document.getElementById("rev_g_amount").value);
-            const sAmt   = parseFloat(document.getElementById("rev_s_amount").value);
-            const gRate  = parseFloat(document.getElementById("rev_g_rate").value);
-            const sRate1k= parseFloat(document.getElementById("rev_s_rate").value);
-            if ([gAmt,sAmt,gRate,sRate1k].some(v => isNaN(v) || v <= 0)) throw new Error("invalid");
-
-            const sRate10 = sRate1k / 100.0;
-
-            function reverseOne(amt, rate10) {
-                const base   = amt / (1 + GST_RATE);
-                const gst    = amt - base;
-                const weight = (base / rate10) * 10;
-                return { base, gst, weight };
-            }
-
-            const g = reverseOne(gAmt, gRate);
-            const s = reverseOne(sAmt, sRate10);
-
-            lines = [
-                "  ═══════════════════════════════════",
-                "  GOLD + SILVER REVERSE CALCULATION",
-                "  ═══════════════════════════════════",
-                "",
-                "  ── GOLD ──────────────────────────",
-                `  Amount (incl. GST) : Rs. ${fmt(gAmt)}`,
-                `  Base Value         : Rs. ${fmt(g.base)}`,
-                `  GST (3%)           : Rs. ${fmt(g.gst)}`,
-                `  Rate / 10g         : Rs. ${fmt(gRate)}`,
-                `  Gold Weight        : ${g.weight.toFixed(4)} grams`,
-                "",
-                "  ── SILVER ────────────────────────",
-                `  Amount (incl. GST) : Rs. ${fmt(sAmt)}`,
-                `  Base Value         : Rs. ${fmt(s.base)}`,
-                `  GST (3%)           : Rs. ${fmt(s.gst)}`,
-                `  Rate / 1kg         : Rs. ${fmt(sRate1k)}`,
-                `  Silver Weight      : ${s.weight.toFixed(4)} grams`,
-                "",
-                "  ── COMBINED ──────────────────────",
-                `  Total Paid         : Rs. ${fmt(gAmt + sAmt)}`,
-                `  Total Base         : Rs. ${fmt(g.base + s.base)}`,
-                `  Total GST          : Rs. ${fmt(g.gst + s.gst)}`,
-                "  ═══════════════════════════════════",
-            ];
-        }
-    } catch(e) {
-        showToast("Please fill in all required fields with valid numbers.", "error");
-        return;
-    }
-
-    const panel = document.getElementById("rev_result");
-    panel.style.display = "";
-    document.getElementById("rev_result_text").textContent = lines.join("\n");
-}
-
-function resetReverseCalc() {
-    document.querySelector('input[name="rev_mode"][value="Gold"]').checked = true;
-    onRevModeChange();
-    document.getElementById("rev_final").value    = "";
-    document.getElementById("rev_g_amount").value = "";
-    document.getElementById("rev_s_amount").value = "";
-    document.getElementById("rev_g_rate").value   = "140000";
-    document.getElementById("rev_s_rate").value   = "245000";
-    resetReverseResult();
-}
-
-function resetReverseResult() {
-    document.getElementById("rev_result").style.display = "none";
-    document.getElementById("rev_result_text").textContent = "";
 }
 
 

@@ -14,12 +14,16 @@
     <!-- ═══════════ HEADER ═══════════ -->
     <header class="main-header">
         <div class="header-inner">
-            <div class="header-emblem">🏅</div>
+            <div class="header-emblem">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Tilak Raj and Sons Logo" class="header-logo-img">
+            </div>
             <div class="header-text">
                 <h1>TILAK RAJ AND SONS JEWELLERS</h1>
                 <p>Gold &bull; Silver &bull; Diamond &bull; Precious Jewellery &bull; Indra Nagar, New Delhi</p>
             </div>
-            <div class="header-emblem">🏅</div>
+            <div class="header-emblem">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Tilak Raj and Sons Logo" class="header-logo-img">
+            </div>
         </div>
         <div class="header-gold-line"></div>
     </header>
@@ -29,7 +33,6 @@
         <nav class="tabs-nav">
             <button class="tab-btn active" data-tab="billing">🧾 &nbsp;Billing</button>
             <button class="tab-btn" data-tab="history">📜 &nbsp;History</button>
-            <button class="tab-btn" data-tab="reverse">🔄 &nbsp;Reverse Calculator</button>
         </nav>
     </div>
 
@@ -96,7 +99,7 @@
                 </div>
                 <div class="field-group">
                     <label>Making Charges</label>
-                    <select id="making_charges" onchange="recalcTotals()">
+                    <select id="making_charges" onchange="recalcTotals(); livePreviewWeight(); livePreviewAmount();">
                         <option value="0">Nil</option>
                         <option value="10">10%</option>
                         <option value="11">11%</option>
@@ -257,87 +260,11 @@
 
     </div><!-- end tab-history -->
 
-
-    <!-- ═══════════════════════════════════════
-         TAB 3: REVERSE CALCULATOR
-    ═══════════════════════════════════════ -->
-    <div class="tab-content" id="tab-reverse">
-
-        <div class="section-header">🔄 &nbsp; Reverse GST Calculator</div>
-        <div class="card reverse-card">
-
-            <!-- Mode selector -->
-            <div class="field-group">
-                <label class="field-label-bold">Calculation Mode</label>
-                <div class="radio-group radio-group-lg">
-                    <label class="radio-label">
-                        <input type="radio" name="rev_mode" value="Gold" checked onchange="onRevModeChange()"> Gold Only
-                    </label>
-                    <label class="radio-label">
-                        <input type="radio" name="rev_mode" value="Silver" onchange="onRevModeChange()"> Silver Only
-                    </label>
-                    <label class="radio-label">
-                        <input type="radio" name="rev_mode" value="Both" onchange="onRevModeChange()"> Both
-                    </label>
-                </div>
-            </div>
-
-            <!-- Final amount (shown for Gold/Silver mode only) -->
-            <div class="rev-section" id="rev-final-group">
-                <div class="field-group field-group-inline">
-                    <label class="field-label-bold">Final Amount Paid (Rs.) <span class="hint">(incl. GST)</span></label>
-                    <input type="number" id="rev_final" placeholder="e.g. 150000" min="0" step="0.01" class="input-wide">
-                </div>
-            </div>
-
-            <!-- Gold sub-section -->
-            <div class="rev-subsection" id="rev-gold-section">
-                <div class="subsection-title gold-title">◆ &nbsp;Gold</div>
-                <div class="rev-fields">
-                    <div class="field-group" id="rev-gold-amount-group" style="display:none;">
-                        <label>Amount for Gold (Rs.) <span class="hint">(incl. GST)</span></label>
-                        <input type="number" id="rev_g_amount" placeholder="0.00" min="0" step="0.01">
-                    </div>
-                    <div class="field-group">
-                        <label>Gold Rate per 10g (Rs.)</label>
-                        <input type="number" id="rev_g_rate" value="140000" min="0" step="0.01">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Silver sub-section -->
-            <div class="rev-subsection" id="rev-silver-section" style="display:none;">
-                <div class="subsection-title silver-title">◆ &nbsp;Silver</div>
-                <div class="rev-fields">
-                    <div class="field-group" id="rev-silver-amount-group" style="display:none;">
-                        <label>Amount for Silver (Rs.) <span class="hint">(incl. GST)</span></label>
-                        <input type="number" id="rev_s_amount" placeholder="0.00" min="0" step="0.01">
-                    </div>
-                    <div class="field-group">
-                        <label>Silver Rate per 1 kg / 1000g (Rs.)</label>
-                        <input type="number" id="rev_s_rate" value="245000" min="0" step="0.01">
-                    </div>
-                </div>
-            </div>
-
-            <div class="rev-btn-row">
-                <button class="btn btn-gold btn-lg" onclick="reverseCalculate()">Calculate</button>
-                <button class="btn btn-outline" onclick="resetReverseCalc()">Reset</button>
-            </div>
-
-            <!-- Results panel -->
-            <div class="result-panel" id="rev_result" style="display:none;">
-                <pre id="rev_result_text"></pre>
-            </div>
-
-        </div>
-    </div><!-- end tab-reverse -->
-
     <!-- ═══════════ STATUS BAR ═══════════ -->
     <footer class="status-bar">
         <span id="status-date"></span>
         <span class="status-mid">Connected to MySQL &nbsp;|&nbsp; Tilak Raj and Sons Jewellers</span>
-        <span class="status-ver">v1.2</span>
+        <span class="status-ver">v1.3</span>
     </footer>
 
     <!-- ═══════════ TOAST ═══════════ -->
