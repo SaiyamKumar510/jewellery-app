@@ -91,6 +91,17 @@ function computeGrand(baseAmt) {
     return { baseAmt, makingAmt, taxable, gst, grand };
 }
 
+/**
+ * Given a grand total (amount entered by user), back-calculate the pure base metal value.
+ * grand = baseAmt * (1 + makingPct/100) * 1.03
+ * => baseAmt = grand / ((1 + makingPct/100) * 1.03)
+ */
+function baseAmtFromGrand(grand) {
+    const makingPct = getMakingPct();
+    const divisor   = (1 + makingPct / 100) * 1.03;
+    return grand / divisor;
+}
+
 function livePreviewWeight() {
     const mode = document.querySelector('input[name="input_mode"]:checked').value;
     if (mode !== "Weight") return;
@@ -111,15 +122,18 @@ function livePreviewAmount() {
     const mode = document.querySelector('input[name="input_mode"]:checked').value;
     if (mode !== "Amount") return;
 
-    const amt  = parseFloat(document.getElementById("amount_input").value);
-    const rate = getRatePer10g();
+    const enteredAmt = parseFloat(document.getElementById("amount_input").value);
+    const rate       = getRatePer10g();
 
-    if (!isNaN(amt) && amt > 0 && rate > 0) {
-        // In Amount mode, the entered amount IS the base metal value
-        const baseAmt = amt;
-        const w       = (amt / rate) * 10;
-        const { grand } = computeGrand(baseAmt);
-        setPreviewHTML(baseAmt, grand, w);
+    if (!isNaN(enteredAmt) && enteredAmt > 0 && rate > 0) {
+        // The entered amount is the GRAND TOTAL (includes making charges + GST)
+        // Back-calculate pure metal base amount by stripping making charges & GST
+        const baseAmt = baseAmtFromGrand(enteredAmt);
+
+        // Derive weight from the pure metal base amount only
+        const w = (baseAmt / rate) * 10;
+
+        setPreviewHTML(baseAmt, enteredAmt, w);
     } else {
         clearPreview();
     }
@@ -127,12 +141,12 @@ function livePreviewAmount() {
 
 /**
  * Sets the two-line live preview:
- *   Line 1 (small, grey): Base: Rs. X  [+ Weight if amount mode]
- *   Line 2 (bold, dark):  Total (incl. GST): Rs. Y
+ *   Line 1 (small, grey): Base metal: Rs. X + making% | Wt: Y g
+ *   Line 2 (bold, dark):  Total (incl. GST): Rs. Z
  */
 function setPreviewHTML(baseAmt, grand, weightG) {
     const makingPct = getMakingPct();
-    let line1 = `Base: Rs. ${fmt(baseAmt)}`;
+    let line1 = `Metal Value: Rs. ${fmt(baseAmt)}`;
     if (makingPct > 0) line1 += ` + ${makingPct}% making`;
     if (weightG !== undefined) line1 += ` | Wt: ${weightG.toFixed(4)} g`;
 
@@ -162,10 +176,14 @@ function addItem() {
         }
         amount = (weight / 10) * rate;
     } else {
-        amount = parseFloat(document.getElementById("amount_input").value);
-        if (isNaN(amount) || amount <= 0) {
+        // Amount mode: entered value is the grand total (with making + GST)
+        // Back-calculate to pure metal base amount, then derive weight
+        const enteredAmt = parseFloat(document.getElementById("amount_input").value);
+        if (isNaN(enteredAmt) || enteredAmt <= 0) {
             showToast("Please enter a valid positive amount.", "error"); return;
         }
+        // Strip making charges & GST to get pure metal base amount
+        amount = baseAmtFromGrand(enteredAmt);
         weight = (amount / rate) * 10;
     }
 
