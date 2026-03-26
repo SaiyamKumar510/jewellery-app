@@ -343,10 +343,16 @@ class PDFGenerator:
         line_h  = 7.5*mm
         pad_l   = 4*mm
         pad_r   = 5*mm
+
+        # Subtotal shown here = metal value + making charges
+        # This matches the sum of Amount column in the items table
+        making_pct = float(data.get("making_pct", 0))
+        subtotal_display = data["subtotal"] * (1 + making_pct / 100)
+
         rows = [
-            ("Subtotal (Metal Value)", data["subtotal"]),
-            ("CGST @ 1.5%",            data["cgst"]),
-            ("SGST @ 1.5%",            data["sgst"]),
+            ("Subtotal (incl. Making Charges)", subtotal_display),
+            ("CGST @ 1.5%",                     data["cgst"]),
+            ("SGST @ 1.5%",                     data["sgst"]),
         ]
         total_box_h = len(rows) * line_h + 14*mm + 4*mm
         c.setFillColor(self.C_OFF)
