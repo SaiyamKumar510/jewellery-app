@@ -293,13 +293,16 @@ class PDFGenerator:
             c.setLineWidth(0.4)
             c.rect(M, cur_y - row_h, table_w, row_h, fill=0, stroke=1)
 
-            display_rate = item["rate"] * (1 + making_pct / 100)
+            # ── Rate/10g and Amount both include making charges ──────────────
+            display_rate   = item["rate"] * (1 + making_pct / 100)
+            display_amount = item["amount"] * (1 + making_pct / 100)
+
             carat = item.get("carat", "-") or "-"
             desc  = item.get("description", "")
             vals  = [
                 str(idx + 1), desc, item["commodity"], carat,
                 item["hsn"], f"{item['weight']:.3f}",
-                f"{display_rate:,.2f}", f"{item['amount']:,.2f}",
+                f"{display_rate:,.2f}", f"{display_amount:,.2f}",
             ]
             c.setFillColor(self.C_BLACK)
             c.setFont("Helvetica", 7.5)
