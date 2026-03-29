@@ -79,40 +79,45 @@ function getMakingPct() {
 }
 
 /**
- * Compute grand total including making charges + GST (3%) for a given base metal amount.
- * Returns { baseAmt, makingAmt, taxable, gst, grand }
+ * Compute amounts for a given weight.
+ * effectiveAmount = weight/10 * rate * (1 + makingPct/100)   [metal + making, pre-GST]
+ * GST is 3% on effectiveAmount
+ * Returns { effectiveAmount, cgst, sgst, grand }
  */
-function computeGrand(baseAmt) {
-    const makingPct  = getMakingPct();
-    const makingAmt  = baseAmt * makingPct / 100;
-    const taxable    = baseAmt + makingAmt;
-    const gst        = taxable * 0.03;   // 3% GST (CGST 1.5% + SGST 1.5%)
-    const grand      = taxable + gst;
-    return { baseAmt, makingAmt, makingPct, taxable, gst, grand };
+function computeBreakdown(weightG, ratePer10g, makingPct) {
+    const metalAmt     = (weightG / 10) * ratePer10g;
+    const effectiveAmt = metalAmt * (1 + makingPct / 100);  // metal + making baked in
+    const cgst         = effectiveAmt * 0.015;
+    const sgst         = effectiveAmt * 0.015;
+    const grand        = effectiveAmt + cgst + sgst;
+    return { metalAmt, effectiveAmt, cgst, sgst, grand };
 }
 
 /**
- * Given a grand total (amount entered by user), back-calculate the pure base metal value.
- * grand = baseAmt * (1 + makingPct/100) * 1.03
- * => baseAmt = grand / ((1 + makingPct/100) * 1.03)
+ * Given a grand total entered by user, back-calculate weight.
+ * grand = (w/10 * rate * (1 + making/100)) * 1.03
+ * => effectiveAmt = grand / 1.03
+ * => metalAmt = effectiveAmt / (1 + making/100)
+ * => w = metalAmt / rate * 10
  */
-function baseAmtFromGrand(grand) {
-    const makingPct = getMakingPct();
-    const divisor   = (1 + makingPct / 100) * 1.03;
-    return grand / divisor;
+function weightFromGrand(grand, ratePer10g, makingPct) {
+    const effectiveAmt = grand / 1.03;
+    const metalAmt     = effectiveAmt / (1 + makingPct / 100);
+    const w            = (metalAmt / ratePer10g) * 10;
+    return { w, effectiveAmt, metalAmt };
 }
 
 function livePreviewWeight() {
     const mode = document.querySelector('input[name="input_mode"]:checked').value;
     if (mode !== "Weight") return;
 
-    const w    = parseFloat(document.getElementById("weight").value);
-    const rate = getRatePer10g();
+    const w       = parseFloat(document.getElementById("weight").value);
+    const rate    = getRatePer10g();
+    const making  = getMakingPct();
 
     if (!isNaN(w) && w > 0 && rate > 0) {
-        const baseAmt = (w / 10) * rate;
-        const breakdown = computeGrand(baseAmt);
-        setPreviewHTML(breakdown, w);
+        const bd = computeBreakdown(w, rate, making);
+        setPreviewHTML(bd, w, rate, making);
     } else {
         clearPreview();
     }
@@ -124,61 +129,52 @@ function livePreviewAmount() {
 
     const enteredAmt = parseFloat(document.getElementById("amount_input").value);
     const rate       = getRatePer10g();
+    const making     = getMakingPct();
 
     if (!isNaN(enteredAmt) && enteredAmt > 0 && rate > 0) {
-        // Entered amount is the GRAND TOTAL — back-calculate base metal
-        const baseAmt = baseAmtFromGrand(enteredAmt);
-        const w       = (baseAmt / rate) * 10;
-        const breakdown = computeGrand(baseAmt);
-        setPreviewHTML(breakdown, w);
+        const { w, effectiveAmt, metalAmt } = weightFromGrand(enteredAmt, rate, making);
+        const cgst  = effectiveAmt * 0.015;
+        const sgst  = effectiveAmt * 0.015;
+        const grand = effectiveAmt + cgst + sgst;
+        setPreviewHTML({ metalAmt, effectiveAmt, cgst, sgst, grand }, w, rate, making);
     } else {
         clearPreview();
     }
 }
 
 /**
- * Renders a detailed step-by-step breakdown in the live preview box.
- * Shows: Metal Value → + Making charges → + GST → = Grand Total
+ * Renders the live preview breakdown.
+ * Making charges are BAKED INTO the rate — not shown as a separate line.
+ * Shows: Effective Rate → Amount (metal+making) → CGST → SGST → Grand Total
  */
-function setPreviewHTML(breakdown, weightG) {
-    const { baseAmt, makingAmt, makingPct, gst, grand } = breakdown;
+function setPreviewHTML(bd, weightG, ratePer10g, makingPct) {
+    const { effectiveAmt, cgst, sgst, grand } = bd;
     const el = document.getElementById("live_preview");
 
-    // Weight line (always shown)
-    const wtLine = `<div class="pb-weight">⚖ Weight: ${weightG.toFixed(4)} g</div>`;
+    // Effective rate per 10g (includes making)
+    const effectiveRate = ratePer10g * (1 + makingPct / 100);
+    const pricePerGram  = effectiveRate / 10;
 
-    // Base metal row
-    const baseRow = `
+    const wtLine = `<div class="pb-weight">⚖ Weight: ${weightG.toFixed(4)} g &nbsp;|&nbsp; Rate: Rs. ${fmt(effectiveRate)}/10g (Rs. ${fmt(pricePerGram)}/g)</div>`;
+
+    const amtRow = `
         <div class="pb-row">
-            <span class="pb-label">Metal Value</span>
-            <span class="pb-value">Rs. ${fmt(baseAmt)}</span>
+            <span class="pb-label">Amount (${weightG.toFixed(4)}g × Rs. ${fmt(pricePerGram)}/g)</span>
+            <span class="pb-value">Rs. ${fmt(effectiveAmt)}</span>
         </div>`;
 
-    // Making charges row (only if > 0)
-    const makingRow = makingPct > 0 ? `
-        <div class="pb-row pb-making">
-            <span class="pb-label">+ Making (${makingPct}%)</span>
-            <span class="pb-value">Rs. ${fmt(makingAmt)}</span>
-        </div>` : `
-        <div class="pb-row pb-nil">
-            <span class="pb-label">Making Charges</span>
-            <span class="pb-value nil">Nil</span>
-        </div>`;
-
-    // GST rows — split into CGST 1.5% + SGST 1.5%
-    const cgst = gst / 2;
-    const sgst = gst / 2;
-    const gstRow = `
+    const cgstRow = `
         <div class="pb-row pb-gst">
             <span class="pb-label">+ CGST (1.5%)</span>
             <span class="pb-value">Rs. ${fmt(cgst)}</span>
-        </div>
+        </div>`;
+
+    const sgstRow = `
         <div class="pb-row pb-gst">
             <span class="pb-label">+ SGST (1.5%)</span>
             <span class="pb-value">Rs. ${fmt(sgst)}</span>
         </div>`;
 
-    // Divider + Grand Total
     const totalRow = `
         <div class="pb-divider"></div>
         <div class="pb-row pb-total">
@@ -186,7 +182,7 @@ function setPreviewHTML(breakdown, weightG) {
             <span class="pb-value grand">Rs. ${fmt(grand)}</span>
         </div>`;
 
-    el.innerHTML = `<div class="preview-breakdown">${wtLine}${baseRow}${makingRow}${gstRow}${totalRow}</div>`;
+    el.innerHTML = `<div class="preview-breakdown">${wtLine}${amtRow}${cgstRow}${sgstRow}${totalRow}</div>`;
 }
 
 function addItem() {
@@ -198,34 +194,33 @@ function addItem() {
     let   desc   = document.getElementById("description").value.trim();
     if (!desc)  desc = (com === "Gold") ? carat + " Gold" : "Silver";
 
-    const hsn      = HSN[com];
-    const mode     = document.querySelector('input[name="input_mode"]:checked').value;
+    const hsn       = HSN[com];
+    const mode      = document.querySelector('input[name="input_mode"]:checked').value;
     const makingPct = getMakingPct();
 
-    let weight, baseAmount, displayAmount, pricePerGram;
+    // effectiveRate = rate per 10g with making baked in
+    const effectiveRate = rate * (1 + makingPct / 100);
+
+    let weight, metalAmt, effectiveAmt, pricePerGram;
 
     if (mode === "Weight") {
         weight = parseFloat(document.getElementById("weight").value);
         if (isNaN(weight) || weight <= 0) {
             showToast("Please enter a valid positive weight.", "error"); return;
         }
-        baseAmount = (weight / 10) * rate;
-        // displayAmount = base metal value + making charges (before GST)
-        // This is the "item amount" shown in the table
-        displayAmount = baseAmount * (1 + makingPct / 100);
-        pricePerGram  = displayAmount / weight;  // price per gram incl. making charges
+        metalAmt     = (weight / 10) * rate;
+        effectiveAmt = metalAmt * (1 + makingPct / 100);   // pre-GST amount
+        pricePerGram = effectiveRate / 10;
     } else {
         // Amount mode: entered value is the GRAND TOTAL (with making + GST)
         const enteredAmt = parseFloat(document.getElementById("amount_input").value);
         if (isNaN(enteredAmt) || enteredAmt <= 0) {
             showToast("Please enter a valid positive amount.", "error"); return;
         }
-        // Strip GST only first to get taxable (metal + making)
-        displayAmount = enteredAmt / 1.03;
-        // Strip making to get base metal
-        baseAmount    = displayAmount / (1 + makingPct / 100);
-        weight        = (baseAmount / rate) * 10;
-        pricePerGram  = displayAmount / weight;
+        effectiveAmt = enteredAmt / 1.03;                              // strip GST
+        metalAmt     = effectiveAmt / (1 + makingPct / 100);           // strip making
+        weight       = (metalAmt / rate) * 10;
+        pricePerGram = effectiveRate / 10;
     }
 
     items.push({
@@ -234,11 +229,12 @@ function addItem() {
         description:  desc,
         carat,
         weight,
-        rate,             // pure metal rate per 10g
-        amount:       baseAmount,        // pure metal value (stored, used for totals)
-        displayAmount,                   // metal + making (shown in table)
+        rate,              // pure metal rate per 10g (stored for backend)
+        effectiveRate,     // rate per 10g incl. making (displayed in table)
+        amount:       metalAmt,        // pure metal value (stored, used for backend totals)
+        displayAmount: effectiveAmt,   // metal + making pre-GST (shown in table & subtotal)
         makingPct,
-        pricePerGram                     // per gram incl. making charges
+        pricePerGram                   // per gram incl. making charges
     });
 
     renderItemsTable();
@@ -260,14 +256,10 @@ function removeItem(idx) {
 function renderItemsTable() {
     const tbody = document.getElementById("itemsBody");
     if (items.length === 0) {
-        tbody.innerHTML = `<tr class="empty-row" id="emptyRow"><td colspan="11">No items added yet. Add an item above.</td></tr>`;
+        tbody.innerHTML = `<tr class="empty-row" id="emptyRow"><td colspan="10">No items added yet. Add an item above.</td></tr>`;
         return;
     }
-    tbody.innerHTML = items.map((it, idx) => {
-        const makingBadge = it.makingPct > 0
-            ? `<span class="making-badge">+${it.makingPct}% MC</span>`
-            : `<span class="making-badge nil">Nil</span>`;
-        return `
+    tbody.innerHTML = items.map((it, idx) => `
         <tr>
             <td>${idx + 1}</td>
             <td>${it.commodity}</td>
@@ -275,25 +267,24 @@ function renderItemsTable() {
             <td style="text-align:left; padding-left:12px;">${it.description}</td>
             <td>${it.hsn}</td>
             <td>${it.weight.toFixed(4)}</td>
-            <td>${fmtN(it.rate)}</td>
+            <td>${fmtN(it.effectiveRate)}</td>
             <td class="price-per-gram-cell">Rs. ${fmtN(it.pricePerGram)}</td>
-            <td>${makingBadge}</td>
             <td><strong class="amount-cell">Rs. ${fmtN(it.displayAmount)}</strong></td>
             <td><button class="btn-remove" onclick="removeItem(${idx})">🗑 Remove</button></td>
         </tr>
-    `}).join("");
+    `).join("");
 }
 
 function recalcTotals() {
     // Sum of displayAmount = metal + making charges (pre-GST)
-    const taxable    = items.reduce((s, i) => s + i.displayAmount, 0);
-    const cgst       = taxable * 0.015;
-    const sgst       = taxable * 0.015;
-    const gst        = cgst + sgst;
-    const grand      = taxable + gst;
-    // subtotal for display = pure metal values
-    const subtotal   = items.reduce((s, i) => s + i.amount, 0);
-    const makingAmt  = taxable - subtotal;
+    const taxable = items.reduce((s, i) => s + i.displayAmount, 0);
+    const cgst    = taxable * 0.015;
+    const sgst    = taxable * 0.015;
+    const gst     = cgst + sgst;
+    const grand   = taxable + gst;
+    // pure metal subtotal (for backend storage)
+    const subtotal  = items.reduce((s, i) => s + i.amount, 0);
+    const makingAmt = taxable - subtotal;
 
     document.getElementById("display_subtotal").textContent = "Rs. " + fmt(taxable);
     document.getElementById("display_gst").textContent      = "Rs. " + fmt(gst);
@@ -320,7 +311,6 @@ function generateInvoice() {
 
     const { subtotal, makingAmt, cgst, sgst, gst, grand, taxable } = recalcTotals();
 
-    // Use first item's makingPct (or 0). All items share same making charge selection.
     const makingPct = items[0]?.makingPct || 0;
 
     const payload = {
