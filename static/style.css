@@ -56,7 +56,6 @@ body {
     justify-content: center;
 }
 
-/* Logo image in header — place your logo.png in static/ folder */
 .header-logo-img {
     width: 54px;
     height: 54px;
@@ -316,7 +315,6 @@ select:focus {
     justify-content: center;
 }
 
-/* Two-line preview: base + grand */
 .preview-base {
     font-size: 11px;
     color: #888;
@@ -438,6 +436,42 @@ tbody tr:hover { background: #FFE8A0; transition: background 0.15s; }
     font-weight: 700;
     font-family: 'Cormorant Garamond', serif;
     font-size: 14px;
+}
+
+/* ─── PRICE PER GRAM CELL ───────────────────────────────── */
+.price-per-gram-cell {
+    color: var(--deep-gold);
+    font-weight: 700;
+    font-size: 12.5px;
+    white-space: nowrap;
+}
+
+/* ─── AMOUNT CELL ───────────────────────────────────────── */
+.amount-cell {
+    color: var(--dark-brown);
+    font-size: 13.5px;
+}
+
+/* ─── MAKING CHARGE BADGE ───────────────────────────────── */
+.making-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Lato', sans-serif;
+    letter-spacing: 0.3px;
+    background: linear-gradient(135deg, var(--dark-gold), var(--deep-gold));
+    color: #fff;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(153,101,21,0.35);
+}
+
+.making-badge.nil {
+    background: #D0D0D0;
+    color: #888;
+    box-shadow: none;
+    font-weight: 400;
 }
 
 .btn-remove {

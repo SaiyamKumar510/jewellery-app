@@ -165,29 +165,49 @@ function addItem() {
     let   desc   = document.getElementById("description").value.trim();
     if (!desc)  desc = (com === "Gold") ? carat + " Gold" : "Silver";
 
-    const hsn  = HSN[com];
-    const mode = document.querySelector('input[name="input_mode"]:checked').value;
+    const hsn      = HSN[com];
+    const mode     = document.querySelector('input[name="input_mode"]:checked').value;
+    const makingPct = getMakingPct();
 
-    let weight, amount;
+    let weight, baseAmount, displayAmount, pricePerGram;
+
     if (mode === "Weight") {
         weight = parseFloat(document.getElementById("weight").value);
         if (isNaN(weight) || weight <= 0) {
             showToast("Please enter a valid positive weight.", "error"); return;
         }
-        amount = (weight / 10) * rate;
+        baseAmount = (weight / 10) * rate;
+        // displayAmount = base metal value + making charges (before GST)
+        // This is the "item amount" shown in the table
+        displayAmount = baseAmount * (1 + makingPct / 100);
+        pricePerGram  = displayAmount / weight;  // price per gram incl. making charges
     } else {
-        // Amount mode: entered value is the grand total (with making + GST)
-        // Back-calculate to pure metal base amount, then derive weight
+        // Amount mode: entered value is the GRAND TOTAL (with making + GST)
         const enteredAmt = parseFloat(document.getElementById("amount_input").value);
         if (isNaN(enteredAmt) || enteredAmt <= 0) {
             showToast("Please enter a valid positive amount.", "error"); return;
         }
-        // Strip making charges & GST to get pure metal base amount
-        amount = baseAmtFromGrand(enteredAmt);
-        weight = (amount / rate) * 10;
+        // Strip GST only first to get taxable (metal + making)
+        displayAmount = enteredAmt / 1.03;
+        // Strip making to get base metal
+        baseAmount    = displayAmount / (1 + makingPct / 100);
+        weight        = (baseAmount / rate) * 10;
+        pricePerGram  = displayAmount / weight;
     }
 
-    items.push({ commodity: com, hsn, description: desc, carat, weight, rate, amount });
+    items.push({
+        commodity:    com,
+        hsn,
+        description:  desc,
+        carat,
+        weight,
+        rate,             // pure metal rate per 10g
+        amount:       baseAmount,        // pure metal value (stored, used for totals)
+        displayAmount,                   // metal + making (shown in table)
+        makingPct,
+        pricePerGram                     // per gram incl. making charges
+    });
+
     renderItemsTable();
     recalcTotals();
 
@@ -207,10 +227,14 @@ function removeItem(idx) {
 function renderItemsTable() {
     const tbody = document.getElementById("itemsBody");
     if (items.length === 0) {
-        tbody.innerHTML = `<tr class="empty-row" id="emptyRow"><td colspan="9">No items added yet. Add an item above.</td></tr>`;
+        tbody.innerHTML = `<tr class="empty-row" id="emptyRow"><td colspan="11">No items added yet. Add an item above.</td></tr>`;
         return;
     }
-    tbody.innerHTML = items.map((it, idx) => `
+    tbody.innerHTML = items.map((it, idx) => {
+        const makingBadge = it.makingPct > 0
+            ? `<span class="making-badge">+${it.makingPct}% MC</span>`
+            : `<span class="making-badge nil">Nil</span>`;
+        return `
         <tr>
             <td>${idx + 1}</td>
             <td>${it.commodity}</td>
@@ -219,27 +243,30 @@ function renderItemsTable() {
             <td>${it.hsn}</td>
             <td>${it.weight.toFixed(4)}</td>
             <td>${fmtN(it.rate)}</td>
-            <td><strong>${fmtN(it.amount)}</strong></td>
+            <td class="price-per-gram-cell">Rs. ${fmtN(it.pricePerGram)}</td>
+            <td>${makingBadge}</td>
+            <td><strong class="amount-cell">Rs. ${fmtN(it.displayAmount)}</strong></td>
             <td><button class="btn-remove" onclick="removeItem(${idx})">🗑 Remove</button></td>
         </tr>
-    `).join("");
+    `}).join("");
 }
 
 function recalcTotals() {
-    const subtotal   = items.reduce((s, i) => s + i.amount, 0);
-    const makingPct  = getMakingPct();
-    const makingAmt  = subtotal * makingPct / 100;
-    const taxable    = subtotal + makingAmt;
+    // Sum of displayAmount = metal + making charges (pre-GST)
+    const taxable    = items.reduce((s, i) => s + i.displayAmount, 0);
     const cgst       = taxable * 0.015;
     const sgst       = taxable * 0.015;
     const gst        = cgst + sgst;
     const grand      = taxable + gst;
+    // subtotal for display = pure metal values
+    const subtotal   = items.reduce((s, i) => s + i.amount, 0);
+    const makingAmt  = taxable - subtotal;
 
-    document.getElementById("display_subtotal").textContent = "Rs. " + fmt(subtotal);
+    document.getElementById("display_subtotal").textContent = "Rs. " + fmt(taxable);
     document.getElementById("display_gst").textContent      = "Rs. " + fmt(gst);
     document.getElementById("display_total").textContent    = "Rs. " + fmt(grand);
 
-    return { subtotal, makingPct, makingAmt, cgst, sgst, gst, grand };
+    return { subtotal, makingAmt, cgst, sgst, gst, grand, taxable };
 }
 
 function clearAll() {
@@ -258,7 +285,10 @@ function generateInvoice() {
     if (!buyer) { showToast("Please enter buyer name.", "error"); return; }
     if (items.length === 0) { showToast("Please add at least one item.", "error"); return; }
 
-    const { subtotal, makingPct, makingAmt, cgst, sgst, gst, grand } = recalcTotals();
+    const { subtotal, makingAmt, cgst, sgst, gst, grand, taxable } = recalcTotals();
+
+    // Use first item's makingPct (or 0). All items share same making charge selection.
+    const makingPct = items[0]?.makingPct || 0;
 
     const payload = {
         buyer_name:  buyer,
@@ -285,7 +315,6 @@ function generateInvoice() {
             showToast("Error: " + data.error, "error");
         } else {
             showToast("✅ Invoice " + data.invoice_no + " saved! PDF downloading...", "success");
-            // Trigger PDF download
             window.location.href = "/download_pdf/" + encodeURIComponent(data.invoice_no);
             clearAll();
         }
@@ -334,7 +363,6 @@ function renderHistoryTable(invoices) {
 function selectInvoice(invoiceNo, rowEl) {
     selectedInvoiceNo = invoiceNo;
 
-    // Highlight row
     document.querySelectorAll("#historyBody tr").forEach(r => r.classList.remove("history-row-selected"));
     rowEl.classList.add("history-row-selected");
 
