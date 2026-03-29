@@ -300,21 +300,116 @@ select:focus {
 
 /* ─── LIVE PREVIEW ──────────────────────────────────────── */
 .live-preview {
-    padding: 8px 14px;
+    padding: 10px 14px;
     background: var(--off-white);
     border: 1px dashed var(--dark-gold);
     border-radius: 5px;
     color: var(--deep-gold);
-    font-style: italic;
     font-size: 13px;
     min-height: 36px;
     display: flex;
-    align-items: center;
-    flex-direction: column;
-    gap: 2px;
+    align-items: stretch;
     justify-content: center;
 }
 
+/* Breakdown container */
+.preview-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}
+
+/* Weight line */
+.pb-weight {
+    font-size: 11px;
+    color: var(--text-mid);
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin-bottom: 2px;
+    font-family: 'Cormorant Garamond', serif;
+}
+
+/* Each breakdown row */
+.pb-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.pb-label {
+    font-size: 11.5px;
+    color: #888;
+    font-style: italic;
+    white-space: nowrap;
+}
+
+.pb-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dark);
+    font-style: normal;
+    white-space: nowrap;
+}
+
+.pb-value.nil {
+    color: #aaa;
+    font-weight: 400;
+    font-style: italic;
+}
+
+/* Making charges row — highlighted */
+.pb-making .pb-label {
+    color: var(--deep-gold);
+    font-style: normal;
+    font-weight: 700;
+    font-size: 11.5px;
+}
+.pb-making .pb-value {
+    color: var(--deep-gold);
+}
+
+/* GST row */
+.pb-gst .pb-label {
+    color: #888;
+}
+.pb-gst .pb-value {
+    color: var(--text-dark);
+}
+
+/* Nil making row */
+.pb-nil .pb-label,
+.pb-nil .pb-value {
+    color: #bbb;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 11px;
+}
+
+/* Divider before total */
+.pb-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--dark-gold), transparent);
+    margin: 3px 0 2px;
+}
+
+/* Grand total row */
+.pb-total .pb-label {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--dark-brown);
+    font-style: normal;
+    letter-spacing: 0.3px;
+}
+.pb-total .pb-value.grand {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--dark-brown);
+}
+
+/* Legacy classes (kept for safety) */
 .preview-base {
     font-size: 11px;
     color: #888;

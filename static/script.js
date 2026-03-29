@@ -88,7 +88,7 @@ function computeGrand(baseAmt) {
     const taxable    = baseAmt + makingAmt;
     const gst        = taxable * 0.03;   // 3% GST (CGST 1.5% + SGST 1.5%)
     const grand      = taxable + gst;
-    return { baseAmt, makingAmt, taxable, gst, grand };
+    return { baseAmt, makingAmt, makingPct, taxable, gst, grand };
 }
 
 /**
@@ -111,8 +111,8 @@ function livePreviewWeight() {
 
     if (!isNaN(w) && w > 0 && rate > 0) {
         const baseAmt = (w / 10) * rate;
-        const { grand } = computeGrand(baseAmt);
-        setPreviewHTML(baseAmt, grand);
+        const breakdown = computeGrand(baseAmt);
+        setPreviewHTML(breakdown, w);
     } else {
         clearPreview();
     }
@@ -126,34 +126,61 @@ function livePreviewAmount() {
     const rate       = getRatePer10g();
 
     if (!isNaN(enteredAmt) && enteredAmt > 0 && rate > 0) {
-        // The entered amount is the GRAND TOTAL (includes making charges + GST)
-        // Back-calculate pure metal base amount by stripping making charges & GST
+        // Entered amount is the GRAND TOTAL — back-calculate base metal
         const baseAmt = baseAmtFromGrand(enteredAmt);
-
-        // Derive weight from the pure metal base amount only
-        const w = (baseAmt / rate) * 10;
-
-        setPreviewHTML(baseAmt, enteredAmt, w);
+        const w       = (baseAmt / rate) * 10;
+        const breakdown = computeGrand(baseAmt);
+        setPreviewHTML(breakdown, w);
     } else {
         clearPreview();
     }
 }
 
 /**
- * Sets the two-line live preview:
- *   Line 1 (small, grey): Base metal: Rs. X + making% | Wt: Y g
- *   Line 2 (bold, dark):  Total (incl. GST): Rs. Z
+ * Renders a detailed step-by-step breakdown in the live preview box.
+ * Shows: Metal Value → + Making charges → + GST → = Grand Total
  */
-function setPreviewHTML(baseAmt, grand, weightG) {
-    const makingPct = getMakingPct();
-    let line1 = `Metal Value: Rs. ${fmt(baseAmt)}`;
-    if (makingPct > 0) line1 += ` + ${makingPct}% making`;
-    if (weightG !== undefined) line1 += ` | Wt: ${weightG.toFixed(4)} g`;
-
+function setPreviewHTML(breakdown, weightG) {
+    const { baseAmt, makingAmt, makingPct, gst, grand } = breakdown;
     const el = document.getElementById("live_preview");
-    el.innerHTML =
-        `<span class="preview-base">${line1}</span>` +
-        `<span class="preview-grand">→ Rs. ${fmt(grand)} (incl. GST)</span>`;
+
+    // Weight line (always shown)
+    const wtLine = `<div class="pb-weight">⚖ Weight: ${weightG.toFixed(4)} g</div>`;
+
+    // Base metal row
+    const baseRow = `
+        <div class="pb-row">
+            <span class="pb-label">Metal Value</span>
+            <span class="pb-value">Rs. ${fmt(baseAmt)}</span>
+        </div>`;
+
+    // Making charges row (only if > 0)
+    const makingRow = makingPct > 0 ? `
+        <div class="pb-row pb-making">
+            <span class="pb-label">+ Making (${makingPct}%)</span>
+            <span class="pb-value">Rs. ${fmt(makingAmt)}</span>
+        </div>` : `
+        <div class="pb-row pb-nil">
+            <span class="pb-label">Making Charges</span>
+            <span class="pb-value nil">Nil</span>
+        </div>`;
+
+    // GST row
+    const gstRow = `
+        <div class="pb-row pb-gst">
+            <span class="pb-label">+ GST (3%)</span>
+            <span class="pb-value">Rs. ${fmt(gst)}</span>
+        </div>`;
+
+    // Divider + Grand Total
+    const totalRow = `
+        <div class="pb-divider"></div>
+        <div class="pb-row pb-total">
+            <span class="pb-label">Grand Total</span>
+            <span class="pb-value grand">Rs. ${fmt(grand)}</span>
+        </div>`;
+
+    el.innerHTML = `<div class="preview-breakdown">${wtLine}${baseRow}${makingRow}${gstRow}${totalRow}</div>`;
 }
 
 function addItem() {
