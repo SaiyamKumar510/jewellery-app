@@ -165,11 +165,17 @@ function setPreviewHTML(breakdown, weightG) {
             <span class="pb-value nil">Nil</span>
         </div>`;
 
-    // GST row
+    // GST rows — split into CGST 1.5% + SGST 1.5%
+    const cgst = gst / 2;
+    const sgst = gst / 2;
     const gstRow = `
         <div class="pb-row pb-gst">
-            <span class="pb-label">+ GST (3%)</span>
-            <span class="pb-value">Rs. ${fmt(gst)}</span>
+            <span class="pb-label">+ CGST (1.5%)</span>
+            <span class="pb-value">Rs. ${fmt(cgst)}</span>
+        </div>
+        <div class="pb-row pb-gst">
+            <span class="pb-label">+ SGST (1.5%)</span>
+            <span class="pb-value">Rs. ${fmt(sgst)}</span>
         </div>`;
 
     // Divider + Grand Total
